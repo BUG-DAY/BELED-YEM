@@ -14,118 +14,130 @@ async def read_root(sehir: str = "Adana"):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>Belediyem Radar 🛸</title>
+        <title>Belediyem Komuta Merkezi 🛸</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
-            :root {{ --neon-blue: #00d2ff; --glass: rgba(255, 255, 255, 0.9); }}
-            * {{ box-sizing: border-box; font-family: 'Orbitron', sans-serif; }}
+            :root {{ --main-blue: #007aff; --accent-red: #ff3b30; --bg: #f5f7fa; }}
+            * {{ box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }}
             body {{ 
-                background: #e0e5ec; margin: 0; padding: 15px; 
-                display: flex; flex-direction: column; height: 100vh; gap: 20px;
-                align-items: center; justify-content: center;
+                background: var(--bg); margin: 0; padding: 10px; 
+                display: flex; flex-direction: column; height: 100vh; gap: 10px;
             }}
 
-            /* TELEVİZYON REKLAM PANOSU */
-            .tv-frame {{ 
-                width: 100%; max-width: 400px; background: #333; padding: 5px; 
-                border-radius: 10px; border: 4px solid #111; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            /* 2. REKLAM TELEVİZYONU (ÜST ORTA) */
+            .tv-container {{
+                width: 80%; margin: 0 auto; background: #222; border: 4px solid #444;
+                border-radius: 12px; padding: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             }}
-            .tv-screen {{ 
-                background: #000; height: 30px; overflow: hidden; position: relative; 
-                display: flex; align-items: center;
-            }}
-            .scroll {{ color: #00ff00; white-space: nowrap; animation: scroll 12s linear infinite; font-family: monospace; font-size: 14px; }}
+            .tv-screen {{ background: #000; height: 30px; overflow: hidden; display: flex; align-items: center; border-radius: 4px; }}
+            .scroll-text {{ color: var(--accent-red); font-weight: bold; white-space: nowrap; animation: scroll 15s linear infinite; font-family: monospace; }}
 
-            /* YUVARLAK RADAR HARİTA (TAM ORTADA) */
-            .map-container {{
-                position: relative; width: 300px; height: 300px;
-                border-radius: 50%; border: 8px solid white;
-                box-shadow: 20px 20px 60px #bebebe, -20px -20px 60px #ffffff;
-                overflow: hidden; z-index: 10;
-            }}
-            #map {{ width: 100%; height: 100%; }}
+            /* ANA DİZİLİM */
+            .main-frame {{ display: flex; flex: 1; gap: 10px; min-height: 0; }}
 
-            /* SOL AYARLAR VE OYUN (YÜZEN) */
-            .left-actions {{ position: absolute; left: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 20px; }}
-            .action-btn {{ 
-                width: 50px; height: 50px; background: #e0e5ec; border-radius: 12px;
-                display: flex; align-items: center; justify-content: center; font-size: 22px;
-                box-shadow: 6px 6px 12px #bebebe, -6px -6px 12px #ffffff; cursor: pointer;
+            /* 4. SOL PANEL (AYARLAR & OYUN - GENİŞ) */
+            .left-panel {{ 
+                width: 25%; background: white; border-radius: 20px; padding: 15px;
+                display: flex; flex-direction: column; gap: 20px; border: 1px solid #ddd;
+                box-shadow: 5px 0 15px rgba(0,0,0,0.02);
             }}
+            .panel-box {{ background: var(--bg); padding: 10px; border-radius: 12px; border: 1px solid #eee; }}
+            .panel-box h3 {{ margin: 0 0 10px 0; font-size: 14px; color: var(--main-blue); }}
 
-            /* SAĞ CANLI DURAK VERİSİ */
-            .live-data {{
-                position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
-                width: 100px; display: flex; flex-direction: column; gap: 10px;
+            /* 1. HARİTA (ORTADA ŞIK) */
+            .map-wrapper {{ 
+                flex: 1; background: white; border-radius: 25px; padding: 8px;
+                border: 2px solid var(--main-blue); box-shadow: 0 10px 30px rgba(0,122,255,0.1);
             }}
-            .bus-card {{
-                background: #e0e5ec; padding: 10px; border-radius: 12px; text-align: center;
-                box-shadow: 4px 4px 8px #bebebe, -4px -4px 8px #ffffff;
+            #map {{ width: 100%; height: 100%; border-radius: 18px; }}
+
+            /* 3. SAĞ PANEL (ARAMA & DURAK - İNCE UZUN) */
+            .right-panel {{ 
+                width: 18%; background: white; border-radius: 20px; padding: 10px;
+                display: flex; flex-direction: column; gap: 10px; border: 1px solid #ddd;
             }}
-            .bus-id {{ font-size: 10px; font-weight: bold; color: #555; }}
-            .bus-dist {{ font-size: 12px; color: var(--neon-blue); font-weight: 900; }}
+            .search-box input {{ 
+                width: 100%; padding: 8px; border-radius: 10px; border: 1px solid #ccc; font-size: 12px;
+            }}
+            .bus-info-card {{ 
+                background: linear-gradient(to bottom, #fff, #f0f7ff); 
+                padding: 10px; border-radius: 12px; border-left: 4px solid var(--main-blue);
+            }}
+            .info-label {{ font-size: 10px; color: #888; text-transform: uppercase; }}
+            .info-value {{ font-size: 13px; font-weight: 800; color: var(--main-blue); }}
 
             /* ALT SAAT */
-            .bottom-info {{ margin-top: 10px; font-weight: 900; font-size: 20px; color: #333; }}
+            .footer {{ text-align: center; font-weight: 900; color: var(--main-blue); font-size: 18px; }}
 
             @keyframes scroll {{ from {{ transform: translateX(100%); }} to {{ transform: translateX(-100%); }} }}
         </style>
     </head>
     <body>
-        <!-- TV Reklam Panosu -->
-        <div class="tv-frame">
+        <!-- 2. TV Reklam Panosu -->
+        <div class="tv-container">
             <div class="tv-screen">
-                <div class="scroll">>>> BELEDİYE TV: {sehir.upper()} HATLARINDA CANLI TAKİP BAŞLADI... MEHMET TAHİR SUNAR...</div>
+                <div class="scroll-text">📺 CANLI YAYIN: ADANA BÜYÜKŞEHİR TERMİNALİ | MEHMET TAHİR SUNAR...</div>
             </div>
         </div>
 
-        <!-- Sol Tuşlar -->
-        <div class="left-actions">
-            <div class="action-btn" onclick="alert('Ayarlar Açıldı')">⚙️</div>
-            <div class="action-btn" onclick="alert('Oyun Başladı')">🎮</div>
+        <div class="main-frame">
+            <!-- 4. Sol Panel (Geniş) -->
+            <div class="left-panel">
+                <div class="panel-box">
+                    <h3>⚙️ SİSTEM AYARI</h3>
+                    <select style="width:100%;" onchange="location.href='/?sehir='+this.value">
+                        <option value="Adana">Adana</option>
+                        <option value="İstanbul">İstanbul</option>
+                        <option value="Ankara">Ankara</option>
+                    </select>
+                </div>
+                <div class="panel-box" style="flex:1;">
+                    <h3>🎮 MOLA ALANI</h3>
+                    <div style="text-align:center; font-size:30px; margin-top:20px;">🕹️</div>
+                    <p style="font-size:11px; color:#666; text-align:center;">XOX ve mini oyunlar bu geniş alana gelecek.</p>
+                </div>
+            </div>
+
+            <!-- 1. Harita (Orta) -->
+            <div class="map-wrapper">
+                <div id="map"></div>
+            </div>
+
+            <!-- 3. Sağ Panel (İnce Uzun) -->
+            <div class="right-panel">
+                <div class="search-box">
+                    <input type="text" placeholder="Otobüs No Ara (Örn: 154)" id="busSearch">
+                </div>
+                <div class="bus-info-card">
+                    <div class="info-label">Seçili Hat</div>
+                    <div class="info-value" id="currentBus">Hat 154</div>
+                    <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
+                    <div class="info-label">Kalan Durak</div>
+                    <div class="info-value" id="eta">3 Durak</div>
+                    <div class="info-label" style="margin-top:10px;">Şu anki Durak</div>
+                    <div class="info-value" style="font-size:11px;">Yüreğir İstasyonu</div>
+                </div>
+            </div>
         </div>
 
-        <!-- Yuvarlak Harita (Radar) -->
-        <div class="map-container">
-            <div id="map"></div>
-        </div>
-
-        <!-- Sağ Canlı Durak Değişen Veriler -->
-        <div class="live-data">
-            <div class="bus-card">
-                <div class="bus-id">HAT 154</div>
-                <div class="bus-dist" id="bus1">3 Durak</div>
-            </div>
-            <div class="bus-card">
-                <div class="bus-id">İTİMAT 1</div>
-                <div class="bus-dist" id="bus2">1 Durak</div>
-            </div>
-            <div class="bus-card">
-                <div class="bus-id">HAT 172</div>
-                <div class="bus-dist" id="bus3">Yakın</div>
-            </div>
-        </div>
-
-        <div class="bottom-info" id="clock">{simdi}</div>
+        <div class="footer" id="clock">{simdi}</div>
 
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
-            // Saat Güncelleme
+            // Saat
             setInterval(() => {{ document.getElementById('clock').textContent = new Date().toLocaleTimeString('tr-TR', {{hour:'2-digit', minute:'2-digit'}}); }}, 1000);
 
-            // Durak Değiştirme Simülasyonu (Canlı Değişen Veri)
-            let duraklar = ["5 Durak", "4 Durak", "3 Durak", "2 Durak", "1 Durak", "DURAKTA"];
-            let i = 0;
+            // Dinamik Durak Verisi
+            let durakSayisi = 5;
             setInterval(() => {{
-                i = (i + 1) % duraklar.length;
-                document.getElementById('bus1').textContent = duraklar[i];
-                document.getElementById('bus2').textContent = duraklar[(i+2)%duraklar.length];
-            }}, 5000); // Her 5 saniyede bir durak değişir
+                durakSayisi = durakSayisi > 0 ? durakSayisi - 1 : 5;
+                document.getElementById('eta').textContent = durakSayisi === 0 ? "DURAKTA" : durakSayisi + " Durak";
+            }}, 5000);
 
-            // Harita Kurulum (Adana Odaklı)
+            // Harita
             var map = L.map('map', {{zoomControl: false}}).setView([36.9914, 35.3308], 14);
             L.tileLayer('https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png').addTo(map);
-            L.circle([36.9914, 35.3308], {{color: 'red', fillColor: '#f03', fillOpacity: 0.5, radius: 200}}).addTo(map);
+            L.marker([36.9914, 35.3308]).addTo(map).bindPopup("<b>Adana Komuta Merkezi</b>");
         </script>
     </body>
     </html>
