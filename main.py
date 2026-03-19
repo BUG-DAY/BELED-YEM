@@ -14,113 +14,105 @@ async def read_root(sehir: str = "Adana"):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>Belediyem Türkiye 🇹🇷</title>
+        <title>Belediyem Kare 🛸</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
-            :root {{ --tr-mavi: #1e3a8a; --tr-altin: #c5a059; --bg-soft: #f1f5f9; }}
+            :root {{ --tr-mavi: #1e3a8a; --tr-kirmizi: #e11d48; --bg: #f8fafc; }}
             * {{ box-sizing: border-box; font-family: 'Inter', sans-serif; }}
             
-            /* ARKA PLAN: TARİHİ DOKU */
             body {{ 
-                background: var(--bg-soft);
-                background-image: url('https://www.transparenttextures.com/patterns/shattered-island.png'); /* Hafif taş dokusu */
-                margin: 0; padding: 15px; display: flex; flex-direction: column; height: 100vh; gap: 10px;
+                background: #cbd5e1; /* Dış arka plan koyu */
+                margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh;
             }}
 
-            /* 3. DİJİTAL EKRAN (DAHA KARE VE ŞIK) */
-            .tv-frame {{
-                width: 90%; max-width: 500px; margin: 0 auto;
-                background: #111; border: 3px solid var(--tr-altin);
-                border-radius: 8px; padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-            }}
-            .tv-display {{ background: #050505; height: 40px; overflow: hidden; display: flex; align-items: center; border: 1px solid #333; }}
-            .scroll-text {{ color: #e11d48; font-weight: 800; white-space: nowrap; animation: scroll 12s linear infinite; font-family: 'Courier New', monospace; }}
-
-            /* ÜST KÖŞE: AYARLAR VE OYUN */
-            .top-right-panel {{
-                position: absolute; top: 15px; right: 15px; z-index: 1000;
-                display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
-            }}
-            .small-btn {{ 
-                background: white; border: 1.5px solid var(--tr-mavi); padding: 8px 12px;
-                border-radius: 12px; font-size: 14px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                display: flex; align-items: center; gap: 5px; font-weight: bold; color: var(--tr-mavi);
+            /* ANA KARE ÇERÇEVE */
+            .app-container {{
+                width: 95vw; height: 95vw; max-width: 500px; max-height: 500px; /* Tam Kare Yapı */
+                background: white; border-radius: 30px; overflow: hidden;
+                display: flex; flex-direction: column; position: relative;
+                box-shadow: 0 25px 50px rgba(0,0,0,0.3); border: 8px solid #334155;
             }}
 
-            /* 4. HARİTA (GENİŞLEMESİNE - TELEVİZYONUN ALTINDA) */
-            .map-box {{ 
-                width: 100%; height: 320px; background: white; border-radius: 20px; 
-                padding: 10px; border: 2px solid var(--tr-mavi);
-                box-shadow: 0 15px 35px rgba(30,58,138,0.15);
+            /* TV PANELİ (ÜSTTE KAREMSİ) */
+            .tv-header {{
+                background: #000; padding: 10px; border-bottom: 4px solid var(--tr-mavi);
             }}
-            #map {{ width: 100%; height: 100%; border-radius: 15px; }}
+            .scroll-text {{ color: var(--tr-kirmizi); font-weight: 900; white-space: nowrap; animation: scroll 10s linear infinite; font-size: 14px; font-family: monospace; }}
 
-            /* DURAK ARAMA VE BİLGİ (SAĞ İNCE ŞERİT) */
-            .info-bar {{
-                position: absolute; right: 15px; top: 120px; width: 110px;
-                background: rgba(255,255,255,0.9); backdrop-filter: blur(10px);
-                border-radius: 20px; padding: 10px; border: 1px solid var(--tr-mavi);
-                display: flex; flex-direction: column; gap: 10px; z-index: 500;
+            /* ORTA ALAN: HARİTA VE PANELLER */
+            .main-view {{ flex: 1; position: relative; display: flex; overflow: hidden; }}
+
+            /* HARİTA (MERKEZDE) */
+            #map {{ flex: 1; z-index: 1; }}
+
+            /* SOL GİZLİ PANEL (UZUNLAMASINA) */
+            .left-side-menu {{
+                position: absolute; left: 0; top: 0; bottom: 0; width: 45px;
+                background: rgba(30, 58, 138, 0.9); backdrop-filter: blur(5px);
+                z-index: 100; display: flex; flex-direction: column; align-items: center; gap: 20px; padding-top: 15px;
+                transition: width 0.3s; overflow: hidden;
             }}
-            .search-input {{ width: 100%; font-size: 10px; padding: 5px; border-radius: 5px; border: 1px solid #ccc; }}
-            .bus-tag {{ background: var(--tr-mavi); color: white; font-size: 10px; padding: 5px; border-radius: 8px; text-align: center; font-weight: bold; }}
+            .left-side-menu:active, .left-side-menu:hover {{ width: 120px; }} /* Üstüne gelince veya basınca açılır */
+            .menu-icon {{ color: white; font-size: 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; }}
+            .menu-text {{ display: none; font-size: 12px; font-weight: bold; }}
+            .left-side-menu:hover .menu-text {{ display: block; }}
 
-            /* 2. OYUN ALANI (EN ALT) */
-            .game-footer {{
-                margin-top: auto; background: white; border-radius: 15px 15px 0 0;
-                padding: 10px; border-top: 3px solid var(--tr-altin); display: flex;
-                justify-content: space-between; align-items: center;
+            /* SAĞ İNCE DURAK PANELİ */
+            .right-track {{
+                width: 70px; background: rgba(255,255,255,0.9); border-left: 2px solid var(--tr-mavi);
+                z-index: 50; display: flex; flex-direction: column; align-items: center; padding: 10px 5px; gap: 10px;
             }}
+            .bus-card {{ background: var(--tr-mavi); color: white; font-size: 9px; padding: 8px 2px; border-radius: 8px; width: 100%; text-align: center; font-weight: bold; }}
 
-            .digital-clock {{ font-size: 22px; font-weight: 900; color: var(--tr-mavi); }}
+            /* ALT SAAT */
+            .bottom-bar {{ background: white; padding: 5px; text-align: center; border-top: 2px solid #eee; }}
+            .digital-clock {{ font-size: 18px; font-weight: 900; color: var(--tr-mavi); }}
 
             @keyframes scroll {{ from {{ transform: translateX(100%); }} to {{ transform: translateX(-100%); }} }}
         </style>
     </head>
     <body>
 
-        <!-- 3. Dijital Ekran (Karemsi TV) -->
-        <div class="tv-frame">
-            <div class="tv-display">
-                <div class="scroll-text">🇹🇷 T.C. BELEDİYE TERMİNALİ | SİSTEM AKTİF | MEHMET TAHİR KOMUTASINDA...</div>
+        <div class="app-container">
+            <!-- Üst TV Paneli -->
+            <div class="tv-header">
+                <div class="scroll-text">📺 TERMİNAL CANLI AKIŞ: MEHMET TAHİR SİSTEMİ %100 AKTİF...</div>
             </div>
-        </div>
 
-        <!-- 1. Sağ Üst Ayarlar -->
-        <div class="top-right-panel">
-            <div class="small-btn" onclick="alert('Ayarlar')">⚙️ Ayarlar</div>
-            <div class="small-btn" onclick="alert('Oyun Başlıyor')">🕹️ Oyun</div>
-        </div>
+            <div class="main-view">
+                <!-- Sol Gizli Menü (Gerektiğinde Uzunlamasına Açılır) -->
+                <div class="left-side-menu">
+                    <div class="menu-icon">⚙️ <span class="menu-text">AYARLAR</span></div>
+                    <div class="menu-icon">🎮 <span class="menu-text">OYUNLAR</span></div>
+                    <div class="menu-icon">🗺️ <span class="menu-text">ROTALAR</span></div>
+                </div>
 
-        <!-- 4. Harita (Genişlemesine) -->
-        <div class="map-box">
-            <div id="map"></div>
-        </div>
+                <!-- Harita -->
+                <div id="map"></div>
 
-        <!-- Sağ İnce Durak Paneli -->
-        <div class="info-bar">
-            <input type="text" class="search-input" placeholder="Hat Ara...">
-            <div class="bus-tag">154: 2 Durak</div>
-            <div class="bus-tag" style="background:#c5a059">İtimat: Yakın</div>
-        </div>
+                <!-- Sağ İnce Takip -->
+                <div class="right-track">
+                    <div style="font-size:10px; font-weight:bold; color:var(--tr-mavi);">CANLI</div>
+                    <div class="bus-card">154: 2dk</div>
+                    <div class="bus-card" style="background:#c5a059">İTİMAT</div>
+                </div>
+            </div>
 
-        <!-- 2. Oyun ve Saat (En Alt) -->
-        <div class="game-footer">
-            <div style="font-size: 14px; font-weight: bold; color: #555;">🎮 Bekleme Alanı</div>
-            <div class="digital-clock" id="clock">{simdi}</div>
+            <!-- Alt Saat -->
+            <div class="bottom-bar">
+                <div class="digital-clock" id="clock">{simdi}</div>
+            </div>
         </div>
 
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
-            // Saat
             setInterval(() => {{ 
                 document.getElementById('clock').textContent = new Date().toLocaleTimeString('tr-TR', {{hour:'2-digit', minute:'2-digit'}}); 
             }}, 1000);
 
-            // Harita (Adana)
             var map = L.map('map', {{zoomControl: false}}).setView([36.9914, 35.3308], 14);
             L.tileLayer('https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png').addTo(map);
-            L.marker([36.9914, 35.3308]).addTo(map).bindPopup("<b>Mehmet Tahir Terminali</b>");
+            L.marker([36.9914, 35.3308]).addTo(map);
         </script>
     </body>
     </html>
