@@ -70,7 +70,7 @@ async def read_root(sehir: str = "Adana"):
             <div class="sidebar">
                 <h2 style="color: #facc15; margin:0; font-size: 1.2rem;">KONTROL</h2>
                 <select onchange="location.href='/?sehir=' + this.value">
-                    <option value="Adana" {"selected" if sehir=="Adana" else ""}>Adana</option>
+                    <option value="Adana" {"selected" if sehur=="Adana" else ""}>Adana</option>
                     <option value="Istanbul" {"selected" if sehir=="Istanbul" else ""}>Istanbul</option>
                     <option value="Ankara" {"selected" if sehir=="Ankara" else ""}>Ankara</option>
                 </select>
