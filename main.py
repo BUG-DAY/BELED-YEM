@@ -42,20 +42,21 @@ AKTIF_ILLER = ["Adana", "İstanbul", "Ankara", "İzmir", "Bursa", "Kocaeli", "Ko
 async def read_root(sehir: str = "Adana"):
     simdi = datetime.datetime.now().strftime("%H:%M")
     
-    # Şehir kontrolü
+    # Python değişkenlerini temiz ve hatasız hazırlıyoruz
     center = ILLER.get(sehir, ILLER["Adana"])
-    is_active = sehir in AKTIF_ILLER
+    lat = center[0]
+    lng = center[1]
     
-    # HTML Select Menüsü Oluşturma
+    is_active = sehir in AKTIF_ILLER
+    is_active_js = "true" if is_active else "false"
+    display_uyari = "none" if is_active else "flex"
+    
+    # Menü seçeneklerini oluşturuyoruz
     options_html = ""
     for s in sorted(ILLER.keys()):
-        status_icon = "🟢" if s in AKTIF_ILLER else "⚪"
-        selected = "selected" if sehir == s else ""
-        options_html += f'<option value="{s}" {selected}>{status_icon} {s}</option>'
-    
-    # Dinamik Arayüz Metinleri
-    durum_metni = "CANLI VERİ AKIŞI" if is_active else "ALTYAPI HAZIR"
-    badge_renk = "#10b981" if is_active else "#94a3b8"
+        ikon = "🟢" if s in AKTIF_ILLER else "⚪"
+        sel = "selected" if sehir == s else ""
+        options_html += f'<option value="{s}" {sel}>{ikon} {s}</option>'
     
     return f"""
     <!DOCTYPE html>
@@ -63,107 +64,83 @@ async def read_root(sehir: str = "Adana"):
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>T.C. Ulaşım Matrisi</title>
-        
+        <title>Ulusal Ulaşım Sistemi</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        
         <style>
             * {{ box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; }}
-            
-            body {{ 
-                background: #0f172a; height: 100vh; display: flex; 
-                align-items: center; justify-content: center; overflow: hidden;
-            }}
+            body {{ background: #f1f5f9; height: 100vh; display: flex; align-items: center; justify-content: center; }}
 
-            .mobile-device {{
-                width: 100vw; height: 100vh; max-width: 420px; max-height: 850px;
+            /* BEYAZ/SADE MOBİL GÖRÜNÜM */
+            .app-container {{
+                width: 100vw; height: 100vh; max-width: 450px; max-height: 850px;
                 background: #ffffff; display: flex; flex-direction: column;
-                position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+                position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.1);
             }}
             
-            @media (min-width: 450px) {{
-                .mobile-device {{ border-radius: 30px; border: 8px solid #020617; }}
+            /* Bilgisayarda telefon gibi dursun */
+            @media (min-width: 460px) {{
+                .app-container {{ border-radius: 24px; border: 6px solid #334155; height: 90vh; }}
             }}
 
-            /* LED TV EKRANI */
-            .led-banner {{
-                background: #000; padding: 12px; border-bottom: 3px solid #0ea5e9; z-index: 1000;
-            }}
-            .ticker-box {{ overflow: hidden; white-space: nowrap; }}
-            .ticker-text {{
-                display: inline-block; color: #38bdf8; font-family: 'Courier New', monospace;
-                font-size: 14px; font-weight: bold; animation: scroll-left 15s linear infinite;
-            }}
+            /* ÜST BİLGİ BANDI (Sade ve Resmi) */
+            .header {{ background: #0f172a; color: white; padding: 15px; text-align: center; border-bottom: 4px solid #3b82f6; }}
+            .header-title {{ font-weight: 800; font-size: 15px; letter-spacing: 1px; margin-bottom: 4px; }}
+            .header-sub {{ font-size: 11px; color: #94a3b8; font-weight: bold; }}
 
-            /* HARİTA ALANI (Kesin Çözüm) */
-            .map-wrapper {{
-                flex-grow: 1; width: 100%; position: relative; background: #e2e8f0;
-            }}
-            #map {{
-                position: absolute; top: 0; bottom: 0; left: 0; right: 0; z-index: 1;
-            }}
+            /* HARİTA ALANI - KESİN ÇÖZÜM */
+            .map-container {{ flex: 1; display: flex; position: relative; background: #e2e8f0; min-height: 300px; width: 100%; }}
+            #map {{ flex: 1; width: 100%; height: 100%; z-index: 1; }}
 
-            /* VERİ BEKLENİYOR UYARISI (Kapalı İller İçin) */
-            .waiting-overlay {{
-                position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-                background: rgba(15, 23, 42, 0.9); padding: 15px 20px; border-radius: 12px;
-                color: white; text-align: center; font-weight: bold; z-index: 1000;
-                border: 1px solid #475569; display: {'none' if is_active else 'block'};
-                box-shadow: 0 10px 25px rgba(0,0,0,0.3); width: 80%;
+            /* BEKLEME UYARISI (Buzlu Cam Efekti) */
+            .overlay {{
+                position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(255,255,255,0.7); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+                display: {display_uyari}; flex-direction: column; align-items: center; justify-content: center;
+                z-index: 1000; text-align: center; padding: 20px;
             }}
-            .waiting-title {{ color: #fbbf24; font-size: 14px; margin-bottom: 5px; }}
-            .waiting-sub {{ font-size: 11px; color: #cbd5e1; font-weight: normal; }}
+            .overlay-box {{ background: white; padding: 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; width: 90%; }}
 
-            /* KONTROL PANELİ */
-            .control-dock {{
-                background: #f8fafc; padding: 20px; border-top: 1px solid #cbd5e1;
-                display: flex; flex-direction: column; gap: 15px; z-index: 1000;
+            /* ALT KONTROLLER */
+            .footer {{ background: #ffffff; padding: 20px; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 15px; z-index: 1000; }}
+            select {{
+                width: 100%; padding: 12px; border-radius: 10px; border: 2px solid #cbd5e1;
+                font-size: 16px; font-weight: bold; background: #f8fafc; outline: none; cursor: pointer;
             }}
-
-            .city-select {{
-                width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1;
-                font-size: 15px; font-weight: bold; color: #0f172a; background: #fff;
-                outline: none; cursor: pointer; appearance: none;
-            }}
-
-            .status-bar {{ display: flex; justify-content: space-between; align-items: center; }}
-            .live-badge {{
-                background: {badge_renk}; color: white; padding: 6px 12px; 
-                border-radius: 20px; font-size: 11px; font-weight: bold; letter-spacing: 1px;
-            }}
-            .clock {{ font-size: 20px; font-weight: 900; color: #1e293b; }}
-
-            @keyframes scroll-left {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
+            .info-row {{ display: flex; justify-content: space-between; align-items: center; font-weight: bold; }}
+            .time {{ font-size: 22px; color: #0f172a; }}
         </style>
     </head>
     <body>
 
-        <div class="mobile-device">
+        <div class="app-container">
             
-            <div class="led-banner">
-                <div class="ticker-box">
-                    <div class="ticker-text">
-                        T.C. ULAŞIM MATRİSİ | ŞEHİR: {sehir.upper()} | DURUM: {durum_metni} | SİSTEM: MEHMET TAHİR
+            <div class="header">
+                <div class="header-title">T.C. ULAŞIM MATRİSİ</div>
+                <div class="header-sub">PROJE: MEHMET TAHİR | ŞEHİR: {sehir.upper()}</div>
+            </div>
+
+            <div class="map-container">
+                <div id="map"></div>
+                
+                <div class="overlay">
+                    <div class="overlay-box">
+                        <div style="font-size:35px; margin-bottom:10px;">🛠️</div>
+                        <h3 style="color:#334155; margin-bottom:8px; font-size:16px;">ALTYAPI HAZIR</h3>
+                        <p style="color:#64748b; font-size:12px; line-height: 1.5;">{sehir} Belediyesi açık veri API bağlantısını sağladığı an canlı takip sistemi devreye girecektir.</p>
                     </div>
                 </div>
             </div>
 
-            <div class="map-wrapper">
-                <div id="map"></div>
-                <div class="waiting-overlay">
-                    <div class="waiting-title">⚠️ ENTEGRASYON BEKLENİYOR</div>
-                    <div class="waiting-sub">{sehir} Belediyesi açık veri API bağlantısı sağlandığında canlı takip aktifleşecektir. Altyapı hazırdır.</div>
-                </div>
-            </div>
-
-            <div class="control-dock">
-                <select class="city-select" onchange="location.href='/?sehir=' + this.value">
+            <div class="footer">
+                <select onchange="location.href='/?sehir=' + this.value">
                     {options_html}
                 </select>
                 
-                <div class="status-bar">
-                    <div class="live-badge">{durum_metni}</div>
-                    <div class="clock" id="live-clock">{simdi}</div>
+                <div class="info-row">
+                    <span style="color: {'#10b981' if is_active else '#64748b'}; font-size: 13px;">
+                        ● {'CANLI SİSTEM AKTİF' if is_active else 'BEKLEMEDE'}
+                    </span>
+                    <span class="time" id="live-time">{simdi}</span>
                 </div>
             </div>
 
@@ -171,27 +148,29 @@ async def read_root(sehir: str = "Adana"):
 
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
-            const center = {center};
-            const isActive = {'true' if is_active else 'false'};
-
-            // Harita Kurulumu (Net ve temiz OpenStreetMap)
-            var map = L.map('map', {{ zoomControl: false }}).setView(center, 13);
-            L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-                maxZoom: 19, attribution: '© OSMap'
+            // Harita Kurulumu (CartoDB Sunucuları Asla Engellemez!)
+            var map = L.map('map', {{ zoomControl: false }}).setView([{lat}, {lng}], 13);
+            
+            L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+                attribution: '© OpenStreetMap © CartoDB',
+                maxZoom: 19
             }}).addTo(map);
 
-            setTimeout(() => {{ map.invalidateSize(); }}, 200);
+            // Haritanın beyaz kalmasını önleyen en önemli kod
+            setTimeout(() => {{ map.invalidateSize(); }}, 400);
 
-            // Sadece Şehir "Açık Veri" ise otobüsleri simüle et
+            const isActive = {is_active_js};
+
+            // Eğer Açık Veri varsa otobüsleri yola çıkar
             if (isActive) {{
                 const busIcon = L.divIcon({{
-                    html: <div style="background:#0ea5e9; width:22px; height:22px; border-radius:50%; border:2px solid #fff; box-shadow:0 2px 5px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; color:white; font-size:10px;">🚌</div>,
-                    className: 'bus-marker'
+                    html: <div style="background:#3b82f6; width:26px; height:26px; border-radius:50%; border:2px solid white; display:flex; align-items:center; justify-content:center; color:white; font-size:13px; box-shadow:0 3px 6px rgba(0,0,0,0.3);">🚌</div>,
+                    className: 'dummy'
                 }});
                 
                 const buses = [];
                 for(let i=0; i<3; i++) {{
-                    let b = L.marker([center[0] + (Math.random()-0.5)*0.03, center[1] + (Math.random()-0.5)*0.03], {{icon: busIcon}}).addTo(map);
+                    let b = L.marker([{lat} + (Math.random()-0.5)*0.03, {lng} + (Math.random()-0.5)*0.03], {{icon: busIcon}}).addTo(map);
                     buses.push(b);
                 }}
 
@@ -205,7 +184,7 @@ async def read_root(sehir: str = "Adana"):
 
             // Canlı Saat
             setInterval(() => {{
-                document.getElementById('live-clock').textContent = new Date().toLocaleTimeString('tr-TR', {{hour:'2-digit', minute:'2-digit'}});
+                document.getElementById('live-time').textContent = new Date().toLocaleTimeString('tr-TR', {{hour:'2-digit', minute:'2-digit'}});
             }}, 1000);
         </script>
     </body>
