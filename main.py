@@ -1,7 +1,7 @@
 # ==============================================================================
 # PROJE       : T.C. ULUSAL ULAŞIM MATRİSİ (UUM)
-# SÜRÜM       : v13.0.0-ABSOLUTE-ZERO-ERROR (BÖLÜM 1)
-# MİMARİ      : %100 SAF İSTEMCİ (Client-Side) - 500 HATASI İMKANSIZLAŞTIRILDI
+# SÜRÜM       : v14.0.0-FINAL-PRESENTATION-CORE (BÖLÜM 1)
+# MİMARİ      : %100 Otonom Ön Yüz (Jüri Sunumuna Özel Kesin Kararlılık)
 # ==============================================================================
 
 from fastapi import FastAPI
@@ -75,10 +75,6 @@ class NationalCore:
 
 db = NationalCore()
 
-@app.get("/api/v1/cities")
-async def api_get_cities():
-    return sorted(list(db.cities.keys()))
-
 @app.get("/api/v1/fleet", response_model=FleetResponse)
 async def api_get_fleet(city: str = "Adana"):
     t_start = time.perf_counter()
@@ -90,8 +86,15 @@ async def api_get_fleet(city: str = "Adana"):
     
     fleet = []
     tot_spd = 0
-    routes = [f"Hat {random.randint(10,99)}", f"Hat {random.randint(100,500)}", "Ekspres Hat", "Ring"]# ==============================================================================
-# HTML ŞABLONLARI (PYTHON MÜDAHALESİ SIFIR - ÇÖKME İHTİMALİ YOKTUR)
+    routes = [f"Hat {random.randint(10,99)}", f"Hat {random.randint(100,500)}", "Ekspres Hat", "Ring"]
+    for r in routes:
+        eta = random.randint(1, 15)
+        spd = random.randint(10, 55) if eta > 1 else 0
+        tot_spd += spd
+        fleet.append(Vehicle(id=r, hedef=f"Durak {random.randint(100,999)}", kalan="DURAKTA" if eta == 1 else f"{eta} Dk", konum=GeoLocation(lat=info["lat"] + random.uniform(-0.03, 0.03), lng=info["lng"] + random.uniform(-0.03, 0.03)), hiz=spd))
+        
+    return FleetResponse(sehir=info["name"], durum="ACTIVE", gecikme_ms=latency, merkez=GeoLocation(lat=info["lat"], lng=info["lng"]), arac_sayisi=len(fleet), ortalama_hiz=int(tot_spd/len(fleet)) if fleet else 0, filo=sorted(fleet, key=lambda x: 0 if x.kalan == "DURAKTA" else int(x.kalan.split()[0])))# ==============================================================================
+# HTML ŞABLONLARI (ŞEHİR LİSTESİ SİSTEME GÖMÜLDÜ - BOŞ ÇIKMA İHTİMALİ SIFIR)
 # ==============================================================================
 
 @app.get("/", response_class=HTMLResponse)
@@ -137,7 +140,6 @@ async def home():
 
 @app.get("/belediye", response_class=HTMLResponse)
 async def belediye_app():
-    # BURADA PYTHON SADECE STATİK METİN DÖNDÜRÜR. REPLACEMENT YOK. HATA YOK.
     return """
     <!DOCTYPE html>
     <html lang="tr">
@@ -180,7 +182,7 @@ async def belediye_app():
     </head>
     <body>
         <div class="app">
-            <div class="led" id="led-bar"><div class="tk-wrap"><div class="tk-text" id="led">📡 MİLLİ ALTYAPI BAŞLATILIYOR | API BAĞLANTISI BEKLENİYOR...</div></div></div>
+            <div class="led" id="led-bar"><div class="tk-wrap"><div class="tk-text" id="led">📡 MİLLİ ALTYAPI BAŞLATILIYOR | SİSTEM BAĞLANTISI BEKLENİYOR...</div></div></div>
             <div class="nav">
                 <a href="/" class="bck">❮ GERİ</a>
                 <select class="sel" id="citySelect"></select>
@@ -189,18 +191,22 @@ async def belediye_app():
             <div class="drw">
                 <div class="hnd"></div>
                 <div class="src-box"><input type="text" id="src" class="src" placeholder="🔍 Hat veya Durak Ara..."></div>
-                <div class="list" id="fleet"><div style="text-align:center; padding:30px; color:#94a3b8; font-size:12px; font-weight:bold;">🔄 Ağ Bağlantısı Kuruluyor...</div></div>
+                <div class="list" id="fleet"><div style="text-align:center; padding:30px; color:#94a3b8; font-size:12px; font-weight:bold;">🔄 Altyapı Hazırlanıyor...</div></div>
             </div>
         </div>
         
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
+            // API'Yİ BEKLEMEK YOK! 81 İL DOĞRUDAN SİSTEME GÖMÜLDÜ. ASLA BOŞ ÇIKMAZ.
+            const CITY_LIST = ["Adana", "Adıyaman", "Afyon", "Ağrı", "Aksaray", "Amasya", "Ankara", "Antalya", "Ardahan", "Artvin", "Aydın", "Balıkesir", "Bartın", "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce", "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Iğdır", "Isparta", "İstanbul", "İzmir", "K.Maraş", "Karabük", "Karaman", "Kars", "Kastamonu", "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir", "Kilis", "Kocaeli", "Konya", "Kütahya", "Malatya", "Manisa", "Mardin", "Mersin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Şanlıurfa", "Şırnak", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Uşak", "Van", "Yalova", "Yozgat", "Zonguldak"];
+
             class NationalEngine {
                 constructor(startCity) {
-                    this.city = startCity;
+                    this.city = CITY_LIST.includes(startCity) ? startCity : 'Adana';
                     this.map = null;
                     this.layer = L.layerGroup();
-                    this.initCities();
+                    
+                    this.initMenu();
                     
                     document.getElementById('src').addEventListener('keyup', (e) => {
                         let val = e.target.value.toUpperCase();
@@ -210,29 +216,25 @@ async def belediye_app():
                     });
                 }
                 
-                async initCities() {
-                    try {
-                        const res = await fetch('/api/v1/cities');
-                        const cities = await res.json();
-                        const sel = document.getElementById('citySelect');
-                        
-                        cities.forEach(c => {
-                            let opt = document.createElement('option');
-                            opt.value = c; opt.innerText = c;
-                            if(c === this.city) opt.selected = true;
-                            sel.appendChild(opt);
-                        });
-                        
-                        sel.addEventListener('change', (e) => {
-                            // SIFIR SAYFA YENİLEMESİ - URL'i gizlice günceller ve haritayı kaydırır
-                            this.city = e.target.value;
-                            window.history.pushState({}, '', '/belediye?city=' + this.city);
-                            this.fetchData();
-                        });
-                        
+                initMenu() {
+                    const sel = document.getElementById('citySelect');
+                    
+                    // LİSTE ANINDA DOLDURULUR. GECİKME YOKTUR.
+                    CITY_LIST.forEach(c => {
+                        let opt = document.createElement('option');
+                        opt.value = c; opt.innerText = c;
+                        if(c === this.city) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                    
+                    sel.addEventListener('change', (e) => {
+                        this.city = e.target.value;
+                        window.history.pushState({}, '', '/belediye?city=' + this.city);
                         this.fetchData();
-                        setInterval(() => this.fetchData(), 4000);
-                    } catch(e) { console.error("Şehir listesi yüklenemedi", e); }
+                    });
+                    
+                    this.fetchData();
+                    setInterval(() => this.fetchData(), 4000);
                 }
                 
                 async fetchData() {
@@ -290,7 +292,7 @@ async def belediye_app():
                             led.innerText = msg + " \u00A0\u00A0\u00A0\u00A0 " + msg;
                         }
                     } catch (e) {
-                        document.getElementById('led').innerText = "🔴 BAĞLANTI KOPTU: İNTERNET AĞINIZI KONTROL EDİN...";
+                        document.getElementById('led').innerText = "🔴 BAĞLANTI KOPTU VEYA SUNUCU UYKUDA... YENİDEN DENENİYOR...";
                         document.getElementById('led').style.color = "#ef4444";
                     }
                 }
@@ -324,10 +326,3 @@ async def mods(mod: str):
     <div style="color:white; font-weight:900;">{t}</div></div>
     <div class="msg">⚠️ Güvenli API Bağlantısı Bekleniyor...<br><br><span style="font-size:12px; color:#64748b;">Altyapı hazır. İlgili açık veri sistemine bağlanıldığında aktifleşecektir.</span></div></div></body></html>
     """
-    for r in routes:
-        eta = random.randint(1, 15)
-        spd = random.randint(10, 55) if eta > 1 else 0
-        tot_spd += spd
-        fleet.append(Vehicle(id=r, hedef=f"Durak {random.randint(100,999)}", kalan="DURAKTA" if eta == 1 else f"{eta} Dk", konum=GeoLocation(lat=info["lat"] + random.uniform(-0.03, 0.03), lng=info["lng"] + random.uniform(-0.03, 0.03)), hiz=spd))
-        
-    return FleetResponse(sehir=info["name"], durum="ACTIVE", gecikme_ms=latency, merkez=GeoLocation(lat=info["lat"], lng=info["lng"]), arac_sayisi=len(fleet), ortalama_hiz=int(tot_spd/len(fleet)) if fleet else 0, filo=sorted(fleet, key=lambda x: 0 if x.kalan == "DURAKTA" else int(x.kalan.split()[0])))
