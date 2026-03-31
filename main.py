@@ -19,7 +19,7 @@ import time
 
 # --- KURUMSAL SİSTEM İZLEME (LOGGING) ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | UUM-CORE | %(levelname)s | %(message)s")
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Ulaşım Matrisi Core API", version="5.0.1", docs_url="/api/docs")
 
