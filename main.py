@@ -2,273 +2,250 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 import datetime
 
-app = FastAPI(title="Türkiye Ulaşım Matrisi")
+app = FastAPI()
 
-# Şehir konfigürasyonu
-CITIES = {
-    "Adana": {
-        "center": [36.9914, 35.3308],
-        "name": "Adana",
-        "led": "📡 CANLI GPS TAKİBİ AKTİF • ADANA BÜYÜKŞEHİR BELEDİYESİ",
-        "bus_color": "#2563eb"
-    },
-    "Ankara": {
-        "center": [39.9334, 32.8597],
-        "name": "Ankara",
-        "led": "📡 EGO CANLI TAKİP • ANKARA BÜYÜKŞEHİR BELEDİYESİ",
-        "bus_color": "#10b981"
-    },
-    "Istanbul": {
-        "center": [41.0082, 28.9784],
-        "name": "İstanbul",
-        "led": "📡 İETT & METROBÜS CANLI • İSTANBUL BÜYÜKŞEHİR BELEDİYESİ",
-        "bus_color": "#db2777"
-    }
-}
-
+# ---------------------------------------------------------
+# 1. ANA MENÜ (Sadece Menü - LED Yok - Harita Yok)
+# ---------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
-async def read_root(sehir: str = "Adana"):
-    simdi = datetime.datetime.now().strftime("%H:%M")
-    
-    # Şehir kontrolü
-    city_key = sehir.capitalize()
-    city = CITIES.get(city_key, CITIES["Adana"])
-    
-    center_lat = city["center"][0]
-    center_lng = city["center"][1]
-    city_name = city["name"]
-    default_led = city["led"]
-    bus_color = city["bus_color"]
-
-    html_content = f"""
+async def ana_ekran():
+    return """
     <!DOCTYPE html>
     <html lang="tr">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>{city_name} Ulaşım Matrisi</title>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <title>Ulaşım Matrisi | Ana Menü</title>
         <style>
-            :root {{
-                --blue: #2563eb; --pink: #db2777; --orange: #ea580c; --green: #10b981; --dark: #0f172a;
-            }}
-            * {{ box-sizing: border-box; font-family: system-ui, sans-serif; margin:0; padding:0; user-select:none; -webkit-tap-highlight-color:transparent; }}
-            body {{ background:#000; height:100vh; display:flex; align-items:center; justify-content:center; overflow:hidden; }}
+            :root { --blue: #2563eb; --pink: #db2777; --orange: #ea580c; --green: #10b981; --dark: #0f172a; }
+            * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; user-select: none; }
+            body { background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+            
+            .app-container { width: 100vw; height: 100vh; max-width: 450px; max-height: 850px; background: #f8fafc; display: flex; flex-direction: column; overflow: hidden; }
+            @media (min-width: 460px) { .app-container { border-radius: 35px; border: 8px solid #1e293b; height: 92vh; } }
+            
+            .home-content { padding: 40px 25px; flex: 1; display: flex; flex-direction: column; }
+            .welcome { font-size: 28px; font-weight: 900; color: var(--dark); line-height: 1.2; margin-bottom: 30px; }
+            .welcome span { color: var(--blue); }
+            .sub-welcome { font-size: 16px; color: #64748b; font-weight: 600; margin-top: 8px; }
 
-            .app-container {{
-                width:100vw; height:100vh; max-width:450px; max-height:850px;
-                background:#f8fafc; position:relative; overflow:hidden;
-            }}
-            @media (min-width:460px) {{ 
-                .app-container {{ border-radius:40px; border:12px solid #1e293b; height:92vh; }} 
-            }}
+            .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+            /* Gerçek link geçişleri için a etiketleri kullanıyoruz */
+            .card {
+                background: white; border-radius: 24px; padding: 30px 10px; text-align: center;
+                box-shadow: 0 8px 20px rgba(0,0,0,0.06); cursor: pointer; text-decoration: none;
+                display: flex; flex-direction: column; align-items: center; gap: 15px; border: 2px solid transparent;
+            }
+            .card:active { transform: scale(0.95); background: #f1f5f9; }
+            .icon-circle { width: 70px; height: 70px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 35px; }
+            .card-label { font-size: 15px; font-weight: 900; color: var(--dark); }
 
-            #map-layer {{ position:absolute; top:0; left:0; width:100%; height:100%; z-index:1; }}
-
-            #home-overlay {{
-                position:absolute; top:0; left:0; width:100%; height:100%;
-                background:#f8fafc; z-index:3000; display:flex; flex-direction:column;
-                padding:32px 25px; transition: transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
-            }}
-
-            .welcome {{ font-size:27px; font-weight:900; color:var(--dark); line-height:1.1; }}
-            .welcome span {{ color:var(--blue); }}
-            .sub-welcome {{ font-size:15px; color:#64748b; font-weight:600; margin-top:8px; }}
-
-            .menu-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:25px; }}
-            .card {{
-                background:white; border-radius:24px; padding:26px 12px; text-align:center;
-                box-shadow:0 10px 25px rgba(0,0,0,0.07); cursor:pointer; transition:all 0.2s ease;
-            }}
-            .card:active {{ transform:scale(0.94); background:#f1f5f9; }}
-            .icon-circle {{ width:68px; height:68px; border-radius:22px; display:flex; align-items:center; justify-content:center; font-size:34px; }}
-            .card-label {{ font-size:14.8px; font-weight:800; margin-top:12px; color:var(--dark); }}
-
-            #module-top {{ position:absolute; top:0; left:0; width:100%; z-index:2000; display:none; flex-direction:column; }}
-            .led-header {{ background:#000; padding:11px 15px; border-bottom:3px solid var(--blue); }}
-            .ticker-text {{ 
-                color:#38bdf8; font-family:monospace; font-size:13.5px; font-weight:bold;
-                white-space:nowrap; overflow:hidden; animation: scroll 20s linear infinite;
-            }}
-            .nav-bar {{ background:var(--dark); padding:15px 20px; display:flex; align-items:center; position:relative; }}
-            .back-btn {{ 
-                position:absolute; left:15px; color:white; font-weight:700; cursor:pointer; 
-                padding:8px 16px; background:#334155; border-radius:10px; font-size:13.5px;
-            }}
-            .nav-title {{ color:white; font-weight:800; font-size:15.5px; margin:0 auto; }}
-
-            #module-bottom {{
-                position:absolute; bottom:0; left:0; right:0; background:white;
-                border-radius:28px 28px 0 0; box-shadow:0 -12px 50px rgba(0,0,0,0.18);
-                z-index:2000; display:none; flex-direction:column; max-height:53%;
-            }}
-            .drawer-bar {{ width:42px; height:5px; background:#cbd5e1; border-radius:10px; margin:12px auto; }}
-            #search-container {{ padding:12px 20px 8px; }}
-            #search-input {{
-                width:100%; padding:14px 16px; border-radius:12px; border:2px solid #e2e8f0;
-                font-size:15px; font-weight:600; background:#f8fafc; outline:none;
-            }}
-            #search-input:focus {{ border-color:var(--blue); }}
-
-            .drawer-content {{ padding:0 20px 20px; overflow-y:auto; flex:1; }}
-            .data-row {{ 
-                display:flex; justify-content:space-between; align-items:center; 
-                padding:14px 0; border-bottom:1px solid #f1f5f9;
-            }}
-            .data-id {{ font-size:16.5px; font-weight:900; color:var(--dark); }}
-            .data-dest {{ font-size:12.8px; color:#64748b; font-weight:600; }}
-            .data-val {{ font-size:13.8px; font-weight:900; padding:7px 14px; border-radius:10px; }}
-
-            @keyframes scroll {{ from {{ transform: translateX(100%); }} to {{ transform: translateX(-100%); }} }}
+            .c-belediye .icon-circle { background: #dbeafe; color: var(--blue); }
+            .c-metro .icon-circle { background: #fce7f3; color: var(--pink); }
+            .c-ozel .icon-circle { background: #ffedd5; color: var(--orange); }
+            .c-kart .icon-circle { background: #d1fae5; color: var(--green); }
         </style>
     </head>
     <body>
-
-    <div class="app-container">
-        <div id="map-layer"></div>
-
-        <!-- Ana Menü -->
-        <div id="home-overlay">
-            <div class="home-header">
-                <div class="welcome">Merhaba <span>Mehmet Tahir</span>,</div>
-                <div class="sub-welcome">{city_name} • {simdi}</div>
-            </div>
-            <div class="menu-grid">
-                <div class="card c-belediye" onclick="openModule('belediye')"><div class="icon-circle">🚌</div><div class="card-label">Belediye</div></div>
-                <div class="card c-metro" onclick="openModule('metro')"><div class="icon-circle">🚇</div><div class="card-label">Metro</div></div>
-                <div class="card c-ozel" onclick="openModule('ozel')"><div class="icon-circle">🚐</div><div class="card-label">Özel Sektör</div></div>
-                <div class="card c-kart" onclick="openModule('kart')"><div class="icon-circle">💳</div><div class="card-label">Kart Dolum</div></div>
+        <div class="app-container">
+            <div class="home-content">
+                <div class="welcome">Merhaba <span>Mehmet Tahir</span>,<br><div class="sub-welcome">Bugün hangi aracı kullanacaksın?</div></div>
+                <div class="menu-grid">
+                    <a href="/belediye" class="card c-belediye"><div class="icon-circle">🚌</div><div class="card-label">Belediye</div></a>
+                    <a href="/metro" class="card c-metro"><div class="icon-circle">🚇</div><div class="card-label">Metro</div></a>
+                    <a href="/ozel" class="card c-ozel"><div class="icon-circle">🚐</div><div class="card-label">Özel Sektör</div></a>
+                    <a href="/kart" class="card c-kart"><div class="icon-circle">💳</div><div class="card-label">Kart Dolum</div></a>
+                </div>
             </div>
         </div>
-
-        <!-- Modül Üst Bar -->
-        <div id="module-top">
-            <div class="led-header">
-                <div class="ticker"><div class="ticker-text" id="led-text">YÜKLENİYOR...</div></div>
-            </div>
-            <div class="nav-bar">
-                <div class="back-btn" onclick="goHome()">❮ GERİ</div>
-                <div class="nav-title" id="nav-title">Ulaşım Bilgileri</div>
-            </div>
-        </div>
-
-        <!-- Alt Çekmece -->
-        <div id="module-bottom">
-            <div class="drawer-bar"></div>
-            <div id="search-container" style="display:none;">
-                <input type="text" id="search-input" placeholder="🔍 Hat veya Durak Ara (örn: 154)">
-            </div>
-            <div class="drawer-content" id="data-list"></div>
-        </div>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        let map, moveInterval = null;
-        let markers = [];
-        const cityCenter = [{center_lat}, {center_lng}];
-        const busColor = "{bus_color}";
-        const cityName = "{city_name}";
-
-        window.onload = function() {{
-            map = L.map('map-layer', {{ zoomControl: false, attributionControl: false }})
-                   .setView(cityCenter, 13);
-            
-            L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
-                maxZoom: 19
-            }}).addTo(map);
-        }};
-
-        function goHome() {{
-            document.getElementById('home-overlay').style.transform = 'translateY(0)';
-            document.getElementById('module-top').style.display = 'none';
-            document.getElementById('module-bottom').style.display = 'none';
-            if (moveInterval) clearInterval(moveInterval);
-            markers.forEach(m => map.removeLayer(m));
-            markers = [];
-        }}
-
-        function openModule(type) {{
-            document.getElementById('home-overlay').style.transform = 'translateY(-100%)';
-            document.getElementById('module-top').style.display = 'flex';
-            document.getElementById('module-bottom').style.display = 'flex';
-
-            const led = document.getElementById('led-text');
-            const title = document.getElementById('nav-title');
-            const list = document.getElementById('data-list');
-            const searchBox = document.getElementById('search-container');
-
-            list.innerHTML = "";
-            searchBox.style.display = type === 'belediye' ? 'block' : 'none';
-
-            setTimeout(() => map.invalidateSize(), 420);
-
-            if (type === 'belediye') {{
-                title.innerText = "BELEDİYE OTOBÜSLERİ";
-                led.innerText = "{default_led}";
-
-                const hatlar = [
-                    {{ id: "154", varis: "Balcalı Hastanesi", durak: "Turgut Özal Blv.", sure: "2 dk" }},
-                    {{ id: "114", varis: "Merkez Otogar", durak: "Baraj Yolu", sure: "5 dk" }},
-                    {{ id: "172", varis: "Çukurova Üni.", durak: "İstasyon", sure: "9 dk" }}
-                ];
-
-                hatlar.forEach(h => {{
-                    const row = document.createElement('div');
-                    row.className = "data-row item-row";
-                    row.innerHTML = `
-                        <div class="data-info">
-                            <span class="data-id">🚌 Hat ${{h.id}}</span>
-                            <span class="data-dest">→ ${{h.varis}}</span>
-                            <span class="data-dest" style="color:#ea580c;">📍 ${{h.durak}}</span>
-                        </div>
-                        <div class="data-val" style="background:#dbeafe; color:#1e40af;">${{h.sure}}</div>
-                    `;
-                    list.appendChild(row);
-                }});
-
-                // Canlı otobüs simülasyonu
-                const iconHtml = <div style="background:${{busColor}};width:26px;height:26px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;">🚌</div>;
-                const busIcon = L.divIcon({{ html: iconHtml, className: '' }});
-
-                markers = [];
-                for (let i = 0; i < 5; i++) {{
-                    const lat = cityCenter[0] + (Math.random() - 0.5) * 0.045;
-                    const lng = cityCenter[1] + (Math.random() - 0.5) * 0.045;
-                    const m = L.marker([lat, lng], {{ icon: busIcon }}).addTo(map);
-                    markers.push(m);
-                }}
-
-                if (moveInterval) clearInterval(moveInterval);
-                moveInterval = setInterval(() => {{
-                    markers.forEach(m => {{
-                        const pos = m.getLatLng();
-                        m.setLatLng([pos.lat + (Math.random()-0.5)*0.001, pos.lng + (Math.random()-0.5)*0.001]);
-                    }});
-                }}, 1600);
-
-            }} else if (type === 'metro') {{
-                title.innerText = "METRO & RAYLI SİSTEM";
-                led.innerText = "🚇 METRO SEFERLERİ DAKİK İŞLİYOR";
-                // metro içeriği eklenebilir
-            }} else if (type === 'ozel') {{
-                title.innerText = "ÖZEL SEKTÖR";
-                led.innerText = "Özel halk otobüsleri entegrasyonu devam ediyor...";
-            }} else if (type === 'kart') {{
-                title.innerText = "KENTKART DOLUM NOKTALARI";
-                led.innerText = "💳 EN YAKIN DOLUM NOKTALARI";
-            }}
-        }}
-
-        // Arama filtreleme
-        document.getElementById('search-input').addEventListener('input', function(e) {{
-            const term = e.target.value.toUpperCase();
-            document.querySelectorAll('.item-row').forEach(row => {{
-                row.style.display = row.textContent.toUpperCase().includes(term) ? 'flex' : 'none';
-            }});
-        }});
-    </script>
     </body>
     </html>
     """
-    return html_content
+
+# ---------------------------------------------------------
+# 2. BELEDİYE OTOBÜSÜ EKRANI (Ayrı Bir Sayfa - Harita ve LED Var)
+# ---------------------------------------------------------
+@app.get("/belediye", response_class=HTMLResponse)
+async def belediye_ekrani():
+    return """
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>Belediye Otobüsleri</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <style>
+            :root { --blue: #2563eb; --dark: #0f172a; }
+            * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; text-decoration: none; }
+            body { background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+            .app-container { width: 100vw; height: 100vh; max-width: 450px; max-height: 850px; background: #f8fafc; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+            @media (min-width: 460px) { .app-container { border-radius: 35px; border: 8px solid #1e293b; height: 92vh; } }
+            
+            /* Üst Bar ve LED */
+            .led-header { background: #000; padding: 10px; border-bottom: 2px solid var(--blue); }
+            .ticker { overflow: hidden; white-space: nowrap; }
+            .ticker-text { display: inline-block; color: #38bdf8; font-family: monospace; font-size: 13px; font-weight: bold; animation: scroll 15s linear infinite; }
+            @keyframes scroll { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+            
+            .nav-bar { background: var(--dark); padding: 15px; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2000; }
+            .back-btn { position: absolute; left: 15px; color: white; font-weight: bold; padding: 6px 12px; background: #334155; border-radius: 8px; font-size: 13px; }
+            .nav-title { color: white; font-weight: 900; font-size: 15px; letter-spacing: 1px; }
+
+            /* Harita ve Liste (Moovit Mantığı) */
+            .map-box { flex: 0.5; width: 100%; position: relative; background: #e2e8f0; }
+            #map { position: absolute; top: 0; bottom: 0; left: 0; right: 0; z-index: 1; }
+            
+            .drawer { flex: 0.5; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -10px 20px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; margin-top: -15px; }
+            .search-box { padding: 15px 20px; }
+            .search-input { width: 100%; padding: 12px 15px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 14px; font-weight: bold; outline: none; background: #f8fafc; color: var(--dark); }
+            .drawer-content { padding: 0 20px 20px; overflow-y: auto; flex: 1; }
+            
+            .data-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+            .data-info { display: flex; flex-direction: column; gap: 4px; }
+            .data-id { font-size: 16px; font-weight: 900; color: var(--dark); }
+            .data-dest { font-size: 11px; color: #64748b; font-weight: 600; display: flex; gap: 5px; align-items: center; }
+            .data-val { font-size: 13px; font-weight: 900; background: #dbeafe; padding: 6px 12px; border-radius: 10px; color: var(--blue); }
+        </style>
+    </head>
+    <body>
+        <div class="app-container">
+            <div class="led-header"><div class="ticker"><div class="ticker-text">📡 BELEDİYE OTOBÜSLERİ CANLI TAKİP SİSTEMİ | GPS AKTİF...</div></div></div>
+            <div class="nav-bar">
+                <a href="/" class="back-btn">❮ GERİ</a>
+                <div class="nav-title">BELEDİYE OTOBÜSLERİ</div>
+            </div>
+            
+            <div class="map-box"><div id="map"></div></div>
+            
+            <div class="drawer">
+                <div class="search-box">
+                    <input type="text" id="searchInput" class="search-input" placeholder="🔍 Hat Ara (Örn: 154)">
+                </div>
+                <div class="drawer-content">
+                    <div class="data-row item"><div class="data-info"><span class="data-id">🚌 Hat 154</span><span class="data-dest">Hedef: Balcalı Hastanesi</span><span class="data-dest" style="color:#ea580c">📍 Şu an: Turgut Özal Blv.</span></div><div class="data-val">2 Dk</div></div>
+                    <div class="data-row item"><div class="data-info"><span class="data-id">🚌 Hat 114</span><span class="data-dest">Hedef: Merkez Otogar</span><span class="data-dest" style="color:#ea580c">📍 Şu an: Baraj Yolu</span></div><div class="data-val">5 Dk</div></div>
+                    <div class="data-row item"><div class="data-info"><span class="data-id">🚌 Hat 172</span><span class="data-dest">Hedef: Çukurova Üniv.</span><span class="data-dest" style="color:#ea580c">📍 Şu an: İstasyon Kavşağı</span></div><div class="data-val">9 Dk</div></div>
+                </div>
+            </div>
+        </div>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script>
+            var map = L.map('map', { zoomControl: false }).setView([36.9914, 35.3308], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+            
+            // Canlı Otobüs Simülasyonu
+            const icon = L.divIcon({ html: <div style="background:#2563eb; width:22px; height:22px; border-radius:50%; border:2px solid #fff; display:flex; align-items:center; justify-content:center; color:white; font-size:10px;">🚌</div>, className: 'm' });
+            let markers = [];
+            for(let i=0; i<3; i++) { markers.push(L.marker([36.9914+(Math.random()-0.5)*0.03, 35.3308+(Math.random()-0.5)*0.03], {icon:icon}).addTo(map)); }
+            setInterval(() => { markers.forEach(m => { let c = m.getLatLng(); m.setLatLng([c.lat+(Math.random()-0.5)*0.002, c.lng+(Math.random()-0.5)*0.002]); }); }, 1500);
+
+            // Arama Motoru
+            document.getElementById('searchInput').addEventListener('keyup', function(e) {
+                let text = e.target.value.toUpperCase();
+                let items = document.querySelectorAll('.item');
+                items.forEach(item => { item.style.display = item.innerText.toUpperCase().includes(text) ? "flex" : "none"; });
+            });
+        </script>
+    </body>
+    </html>
+    """
+
+# ---------------------------------------------------------
+# 3. METRO EKRANI (Ayrı Sayfa)
+# ---------------------------------------------------------
+@app.get("/metro", response_class=HTMLResponse)
+async def metro_ekrani():
+    return """
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>Metro Seferleri</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <style>
+            :root { --pink: #db2777; --dark: #0f172a; }
+            * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; text-decoration: none; }
+            body { background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+            .app-container { width: 100vw; height: 100vh; max-width: 450px; max-height: 850px; background: #f8fafc; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+            @media (min-width: 460px) { .app-container { border-radius: 35px; border: 8px solid #1e293b; height: 92vh; } }
+            
+            .led-header { background: #000; padding: 10px; border-bottom: 2px solid var(--pink); }
+            .ticker { overflow: hidden; white-space: nowrap; }
+            .ticker-text { display: inline-block; color: #f472b6; font-family: monospace; font-size: 13px; font-weight: bold; animation: scroll 15s linear infinite; }
+            @keyframes scroll { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+            
+            .nav-bar { background: var(--dark); padding: 15px; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2000; }
+            .back-btn { position: absolute; left: 15px; color: white; font-weight: bold; padding: 6px 12px; background: #334155; border-radius: 8px; font-size: 13px; }
+            .nav-title { color: white; font-weight: 900; font-size: 15px; letter-spacing: 1px; }
+
+            .map-box { flex: 0.5; width: 100%; position: relative; background: #e2e8f0; }
+            #map { position: absolute; top: 0; bottom: 0; left: 0; right: 0; z-index: 1; }
+            
+            .drawer { flex: 0.5; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -10px 20px rgba(0,0,0,0.1); z-index: 1000; padding: 20px; overflow-y: auto; margin-top: -15px;}
+            
+            .data-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f1f5f9; }
+            .data-info { display: flex; flex-direction: column; gap: 4px; }
+            .data-id { font-size: 16px; font-weight: 900; color: var(--dark); }
+            .data-dest { font-size: 11px; color: #64748b; font-weight: 600; }
+            .data-val { font-size: 14px; font-weight: 900; background: #fce7f3; padding: 8px 15px; border-radius: 10px; color: var(--pink); }
+        </style>
+    </head>
+    <body>
+        <div class="app-container">
+            <div class="led-header"><div class="ticker"><div class="ticker-text">🚇 METRO SEFERLERİ DAKİK İŞLİYOR | SONRAKİ TREN YAKLAŞIYOR...</div></div></div>
+            <div class="nav-bar">
+                <a href="/" class="back-btn">❮ GERİ</a>
+                <div class="nav-title">METRO SAATLERİ</div>
+            </div>
+            <div class="map-box"><div id="map"></div></div>
+            <div class="drawer">
+                <div class="data-row"><div class="data-info"><span class="data-id">M1 - Hastane İstasyonu</span><span class="data-dest">Yön: Akıncılar</span></div><div class="data-val">14:30</div></div>
+                <div class="data-row"><div class="data-info"><span class="data-id">M1 - Vilayet İstasyonu</span><span class="data-dest">Yön: Hastane</span></div><div class="data-val">14:38</div></div>
+            </div>
+        </div>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script>
+            var map = L.map('map', { zoomControl: false }).setView([36.9914, 35.3308], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+        </script>
+    </body>
+    </html>
+    """
+
+# ---------------------------------------------------------
+# 4. ÖZEL SEKTÖR / KART DOLUM EKRANI
+# ---------------------------------------------------------
+@app.get("/{modul}", response_class=HTMLResponse)
+async def diger_ekranlar(modul: str):
+    if modul not in ["ozel", "kart"]: return "<a href='/'>Geri Dön</a>"
+    
+    baslik = "ÖZEL SEKTÖR" if modul == "ozel" else "KART DOLUM"
+    metin = "⚠️ Özel Sektör API Entegrasyonu Bekleniyor..." if modul == "ozel" else "📍 Kentkart Merkez Gişe: 200m Mesafede"
+    
+    return f"""
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * {{ box-sizing: border-box; font-family: 'Segoe UI', sans-serif; text-decoration: none; }}
+            body {{ background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }}
+            .app-container {{ width: 100vw; height: 100vh; max-width: 450px; max-height: 850px; background: #f8fafc; display: flex; flex-direction: column; }}
+            .nav-bar {{ background: #0f172a; padding: 15px; display: flex; align-items: center; justify-content: center; position: relative; }}
+            .back-btn {{ position: absolute; left: 15px; color: white; font-weight: bold; padding: 6px 12px; background: #334155; border-radius: 8px; font-size: 13px; }}
+            .content {{ padding: 30px; text-align: center; color: #1e293b; font-weight: bold; font-size: 16px; margin-top: 50px; border: 2px dashed #cbd5e1; border-radius: 15px; margin: 30px; }}
+        </style>
+    </head>
+    <body>
+        <div class="app-container">
+            <div class="nav-bar">
+                <a href="/" class="back-btn">❮ GERİ</a>
+                <div style="color:white; font-weight:900;">{baslik}</div>
+            </div>
+            <div class="content">{metin}</div>
+        </div>
+    </body>
+    </html>
+    """
