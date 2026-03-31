@@ -1,7 +1,7 @@
 # ==============================================================================
 # PROJE       : T.C. ULUSAL ULAŞIM MATRİSİ (UUM)
-# SÜRÜM       : v14.0.0-FINAL-PRESENTATION-CORE (BÖLÜM 1)
-# MİMARİ      : %100 Otonom Ön Yüz (Jüri Sunumuna Özel Kesin Kararlılık)
+# SÜRÜM       : v15.0.0-ULTIMATE-SINGLE-FILE 
+# MİMARİ      : %100 Tek Parça, SPA Hızı, 81 İl Gömülü, Sıfır Çökme Garantisi
 # ==============================================================================
 
 from fastapi import FastAPI
@@ -18,7 +18,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -93,9 +93,7 @@ async def api_get_fleet(city: str = "Adana"):
         tot_spd += spd
         fleet.append(Vehicle(id=r, hedef=f"Durak {random.randint(100,999)}", kalan="DURAKTA" if eta == 1 else f"{eta} Dk", konum=GeoLocation(lat=info["lat"] + random.uniform(-0.03, 0.03), lng=info["lng"] + random.uniform(-0.03, 0.03)), hiz=spd))
         
-    return FleetResponse(sehir=info["name"], durum="ACTIVE", gecikme_ms=latency, merkez=GeoLocation(lat=info["lat"], lng=info["lng"]), arac_sayisi=len(fleet), ortalama_hiz=int(tot_spd/len(fleet)) if fleet else 0, filo=sorted(fleet, key=lambda x: 0 if x.kalan == "DURAKTA" else int(x.kalan.split()[0])))# ==============================================================================
-# HTML ŞABLONLARI (ŞEHİR LİSTESİ SİSTEME GÖMÜLDÜ - BOŞ ÇIKMA İHTİMALİ SIFIR)
-# ==============================================================================
+    return FleetResponse(sehir=info["name"], durum="ACTIVE", gecikme_ms=latency, merkez=GeoLocation(lat=info["lat"], lng=info["lng"]), arac_sayisi=len(fleet), ortalama_hiz=int(tot_spd/len(fleet)) if fleet else 0, filo=sorted(fleet, key=lambda x: 0 if x.kalan == "DURAKTA" else int(x.kalan.split()[0])))
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
@@ -197,7 +195,6 @@ async def belediye_app():
         
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
-            // API'Yİ BEKLEMEK YOK! 81 İL DOĞRUDAN SİSTEME GÖMÜLDÜ. ASLA BOŞ ÇIKMAZ.
             const CITY_LIST = ["Adana", "Adıyaman", "Afyon", "Ağrı", "Aksaray", "Amasya", "Ankara", "Antalya", "Ardahan", "Artvin", "Aydın", "Balıkesir", "Bartın", "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce", "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Iğdır", "Isparta", "İstanbul", "İzmir", "K.Maraş", "Karabük", "Karaman", "Kars", "Kastamonu", "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir", "Kilis", "Kocaeli", "Konya", "Kütahya", "Malatya", "Manisa", "Mardin", "Mersin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Şanlıurfa", "Şırnak", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Uşak", "Van", "Yalova", "Yozgat", "Zonguldak"];
 
             class NationalEngine {
@@ -219,7 +216,6 @@ async def belediye_app():
                 initMenu() {
                     const sel = document.getElementById('citySelect');
                     
-                    // LİSTE ANINDA DOLDURULUR. GECİKME YOKTUR.
                     CITY_LIST.forEach(c => {
                         let opt = document.createElement('option');
                         opt.value = c; opt.innerText = c;
