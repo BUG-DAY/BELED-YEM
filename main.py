@@ -1,8 +1,7 @@
 # ==============================================================================
 # PROJE       : T.C. ULUSAL ULAŞIM MATRİSİ (UUM)
-# SÜRÜM       : v11.0.0-NATIONAL-INFRASTRUCTURE (BÖLÜM 1)
-# MİMARİ      : %100 SPA (Single Page Application) - SIFIR SAYFA YENİLEME
-# ÖZELLİK     : 81 İl Koordinatları, Devlet İzni Bekleme Modülü
+# SÜRÜM       : v12.0.0-BULLETPROOF-CITY-MATRIX (BÖLÜM 1)
+# ÖZELLİK     : Şehir listesi HTML'e betonlandı (Asla boş çıkmaz), %100 SPA Hızı.
 # ==============================================================================
 
 from fastapi import FastAPI
@@ -36,7 +35,7 @@ class Vehicle(BaseModel):
 
 class FleetResponse(BaseModel):
     sehir: str
-    durum: str  # "ACTIVE" veya "AWAITING_API"
+    durum: str
     gecikme_ms: float
     merkez: GeoLocation
     arac_sayisi: int
@@ -45,10 +44,8 @@ class FleetResponse(BaseModel):
 
 class NationalCore:
     def _init_(self):
-        # Pilot Şehirler (Açık Verisi Aktif Olanlar)
         self.active_cities = ["Adana", "Ankara", "İstanbul", "İzmir", "Bursa"]
         
-        # Türkiye 81 İl Merkez Koordinatları (Milli Altyapı)
         self.cities = {
             "Adana": [36.99, 35.33], "Adıyaman": [37.76, 38.27], "Afyon": [38.75, 30.55], "Ağrı": [39.71, 43.05],
             "Aksaray": [38.36, 33.99], "Amasya": [40.65, 35.83], "Ankara": [39.93, 32.85], "Antalya": [36.88, 30.70],
@@ -79,10 +76,6 @@ class NationalCore:
 
 db = NationalCore()
 
-@app.get("/api/v1/cities")
-async def get_all_cities():
-    return sorted(list(db.cities.keys()))
-
 @app.get("/api/v1/fleet", response_model=FleetResponse)
 async def get_fleet(city: str = "Adana"):
     t_start = time.perf_counter()
@@ -102,7 +95,7 @@ async def get_fleet(city: str = "Adana"):
         fleet.append(Vehicle(id=r, hedef=f"Durak {random.randint(100,999)}", kalan="DURAKTA" if eta == 1 else f"{eta} Dk", konum=GeoLocation(lat=info["lat"] + random.uniform(-0.03, 0.03), lng=info["lng"] + random.uniform(-0.03, 0.03)), hiz=spd))
         
     return FleetResponse(sehir=info["name"], durum="ACTIVE", gecikme_ms=latency, merkez=GeoLocation(lat=info["lat"], lng=info["lng"]), arac_sayisi=len(fleet), ortalama_hiz=int(tot_spd/len(fleet)) if fleet else 0, filo=sorted(fleet, key=lambda x: 0 if x.kalan == "DURAKTA" else int(x.kalan.split()[0])))# ==============================================================================
-# ÖN YÜZ (FRONTEND) - SAYFA YENİLEMESİZ JET GİBİ GEÇİŞ MİMARİSİ
+# ÖN YÜZ (FRONTEND) - GARANTİLİ ŞEHİR LİSTESİ (HTML İÇİNE GÖMÜLDÜ)
 # ==============================================================================
 
 @app.get("/", response_class=HTMLResponse)
@@ -148,7 +141,10 @@ async def home():
 
 @app.get("/belediye", response_class=HTMLResponse)
 async def belediye_app():
-    return """
+    # ŞEHiR LİSTESİ ARTIK API İLE DEĞİL, DOĞRUDAN HTML'E GÖMÜLÜYOR (Asla Hata Vermez)
+    options_html = "".join([f"<option value='{city}'>{city}</option>" for city in sorted(db.cities.keys())])
+    
+    html_template = """
     <!DOCTYPE html>
     <html lang="tr">
     <head>
@@ -193,7 +189,9 @@ async def belediye_app():
             <div class="led" id="led-bar"><div class="tk-wrap"><div class="tk-text" id="led">📡 MİLLİ ALTYAPI BAŞLATILIYOR | API BAĞLANTISI BEKLENİYOR...</div></div></div>
             <div class="nav">
                 <a href="/" class="bck">❮ GERİ</a>
-                <select class="sel" id="citySelect"></select>
+                <select class="sel" id="citySelect">
+                    _CITY_OPTIONS_
+                </select>
             </div>
             <div class="map-box"><div id="map"></div></div>
             <div class="drw">
@@ -210,36 +208,24 @@ async def belediye_app():
                     this.city = 'Adana';
                     this.map = null;
                     this.layer = L.layerGroup();
-                    this.initCities();
                     
+                    // SPA: Şehir menüden değiştiğinde sayfa yenilenmez, sadece veri çekilir.
+                    document.getElementById('citySelect').addEventListener('change', (e) => {
+                        this.city = e.target.value;
+                        this.fetchData();
+                    });
+
+                    // Arama Çubuğu
                     document.getElementById('src').addEventListener('keyup', (e) => {
                         let val = e.target.value.toUpperCase();
                         document.querySelectorAll('.item').forEach(r => {
                             r.style.display = r.innerText.toUpperCase().includes(val) ? "flex" : "none";
                         });
                     });
-                }
-                
-                async initCities() {
-                    try {
-                        const res = await fetch('/api/v1/cities');
-                        const cities = await res.json();
-                        const sel = document.getElementById('citySelect');
-                        cities.forEach(c => {
-                            let opt = document.createElement('option');
-                            opt.value = c; opt.innerText = c;
-                            if(c === this.city) opt.selected = true;
-                            sel.appendChild(opt);
-                        });
-                        
-                        sel.addEventListener('change', (e) => {
-                            this.city = e.target.value;
-                            this.fetchData();
-                        });
-                        
-                        this.fetchData();
-                        setInterval(() => this.fetchData(), 4000);
-                    } catch(e) { console.error(e); }
+
+                    // İlk başlatma
+                    this.fetchData();
+                    setInterval(() => this.fetchData(), 4000);
                 }
                 
                 async fetchData() {
@@ -247,12 +233,14 @@ async def belediye_app():
                         const res = await fetch('/api/v1/fleet?city=' + this.city);
                         const data = await res.json();
                         
+                        // Harita Yönetimi
                         if (!this.map) {
                             this.map = L.map('map', { zoomControl: false }).setView([data.merkez.lat, data.merkez.lng], 13);
                             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {maxZoom: 19}).addTo(this.map);
                             this.layer.addTo(this.map);
                             setTimeout(() => { if(this.map) this.map.invalidateSize(); }, 300);
                         } else {
+                            // Harita uçak gibi yeni şehre kayar
                             this.map.setView([data.merkez.lat, data.merkez.lng], 13);
                         }
                         
@@ -263,6 +251,7 @@ async def belediye_app():
                         this.layer.clearLayers();
                         
                         if (data.durum === "AWAITING_API") {
+                            // DEVLET İZNİ BEKLENEN ŞEHİRLER
                             ledBar.style.borderBottom = "2px solid #eab308";
                             led.style.color = "#facc15";
                             led.innerText = 🟡 MİLLİ ALTYAPI HAZIR | ${data.sehir.toUpperCase()} İÇİN DEVLET AÇIK VERİ İZNİ BEKLENİYOR... \u00A0\u00A0\u00A0\u00A0 🟡 MİLLİ ALTYAPI HAZIR | ${data.sehir.toUpperCase()} İÇİN DEVLET AÇIK VERİ İZNİ BEKLENİYOR...;
@@ -274,6 +263,7 @@ async def belediye_app():
                                 </div>
                             `;
                         } else {
+                            // AKTİF ŞEHİRLER
                             ledBar.style.borderBottom = "2px solid #2563eb";
                             led.style.color = "#38bdf8";
                             const icon = L.divIcon({ html: '<div style="background:#2563eb; width:22px; height:22px; border-radius:50%; border:2px solid #fff; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; box-shadow:0 2px 5px rgba(0,0,0,0.3);">🚌</div>', className: 'm' });
@@ -307,6 +297,8 @@ async def belediye_app():
     </body>
     </html>
     """
+    # HTML kodundaki _CITY_OPTIONS_ yazan yeri, Python ile ürettiğimiz 81 il listesiyle değiştiriyoruz. (Hataya Karşı Zırhlıdır)
+    return HTMLResponse(content=html_template.replace("_CITY_OPTIONS_", options_html))
 
 @app.get("/{mod}", response_class=HTMLResponse)
 async def mods(mod: str):
